@@ -28,11 +28,55 @@ jobs:
       - name: Generate Gradle wrapper
         run: gradle wrapper --gradle-version 8.2
 
-      - name: Build Debug APK
-        run: ./gradlew assembleDebug
+      - name: Generate keystore
+        run: |
+          keytool -genkey -v \
+            -keystore app/qris-sender.keystore \
+            -alias qris-sender \
+            -keyalg RSA -keysize 2048 -validity 10000 \
+            -storepass qrissender2024 \
+            -keypass qrissender2024 \
+            -dname "CN=QRIS Sender, OU=Dev, O=QRIS, L=Jakarta, S=Indonesia, C=ID"
+
+      - name: Create keystore.properties
+        run: |
+          cat > app/keystore.properties << 'PROPS'
+          storeFile=qris-sender.keystore
+          storePassword=qrissender2024
+          keyAlias=qris-sender
+          keyPassword=qrissender2024
+          PROPS
+
+      - name: Update app build.gradle for signing
+        run: |
+          cat >> app/build.gradle << 'SIGNING'
+
+          android {
+              signingConfigs {
+                  release {
+                      def keystorePropertiesFile = rootProject.file("app/keystore.properties")
+                      def keystoreProperties = new Properties()
+                      keystoreProperties.load(new FileInputStream(keystorePropertiesFile))
+
+                      storeFile rootProject.file(keystoreProperties['storeFile'])
+                      storePassword keystoreProperties['storePassword']
+                      keyAlias keystoreProperties['keyAlias']
+                      keyPassword keystoreProperties['keyPassword']
+                  }
+              }
+              buildTypes {
+                  release {
+                      signingConfig signingConfigs.release
+                  }
+              }
+          }
+          SIGNING
+
+      - name: Build Release APK
+        run: ./gradlew assembleRelease
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
           name: qris-sender-apk
-          path: app/build/outputs/apk/debug/app-debug.apk
+          path: app/build/outputs/apk/release/app-release.apk
