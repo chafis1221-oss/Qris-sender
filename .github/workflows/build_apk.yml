@@ -28,6 +28,24 @@ jobs:
       - name: Generate Gradle wrapper
         run: gradle wrapper --gradle-version 8.2
 
+      - name: Generate app icon from logo
+        run: |
+          sudo apt-get install -y imagemagick
+          mkdir -p app/src/main/res/mipmap-mdpi
+          mkdir -p app/src/main/res/mipmap-hdpi
+          mkdir -p app/src/main/res/mipmap-xhdpi
+          mkdir -p app/src/main/res/mipmap-xxhdpi
+          mkdir -p app/src/main/res/mipmap-xxxhdpi
+          convert logo.png -resize 48x48 app/src/main/res/mipmap-mdpi/ic_launcher.png
+          convert logo.png -resize 72x72 app/src/main/res/mipmap-hdpi/ic_launcher.png
+          convert logo.png -resize 96x96 app/src/main/res/mipmap-xhdpi/ic_launcher.png
+          convert logo.png -resize 144x144 app/src/main/res/mipmap-xxhdpi/ic_launcher.png
+          convert logo.png -resize 192x192 app/src/main/res/mipmap-xxxhdpi/ic_launcher.png
+
+      - name: Restore AndroidManifest with proper icon
+        run: |
+          sed -i 's|@android:mipmap/sym_def_app_icon|@mipmap/ic_launcher|' app/src/main/AndroidManifest.xml
+
       - name: Generate keystore
         run: |
           keytool -genkey -v \
@@ -38,42 +56,61 @@ jobs:
             -keypass qrissender2024 \
             -dname "CN=QRIS Sender, OU=Dev, O=QRIS, L=Jakarta, S=Indonesia, C=ID"
 
-      - name: Create keystore.properties
+      - name: Build Release APK
         run: |
-          cat > app/keystore.properties << 'PROPS'
-          storeFile=qris-sender.keystore
-          storePassword=qrissender2024
-          keyAlias=qris-sender
-          keyPassword=qrissender2024
-          PROPS
-
-      - name: Update app build.gradle for signing
-        run: |
-          cat >> app/build.gradle << 'SIGNING'
+          export KEYSTORE_PATH=$(realpath app/qris-sender.keystore)
+          cat > app/build.gradle << 'SIGNING'
+          plugins {
+              id 'com.android.application'
+              id 'org.jetbrains.kotlin.android'
+          }
 
           android {
+              namespace 'com.qrissender'
+              compileSdk 34
+
+              defaultConfig {
+                  applicationId "com.qrissender"
+                  minSdk 23
+                  targetSdk 34
+                  versionCode 1
+                  versionName "1.0"
+              }
+
               signingConfigs {
                   release {
-                      def keystorePropertiesFile = rootProject.file("app/keystore.properties")
-                      def keystoreProperties = new Properties()
-                      keystoreProperties.load(new FileInputStream(keystorePropertiesFile))
-
-                      storeFile rootProject.file(keystoreProperties['storeFile'])
-                      storePassword keystoreProperties['storePassword']
-                      keyAlias keystoreProperties['keyAlias']
-                      keyPassword keystoreProperties['keyPassword']
+                      storeFile file(System.getenv('KEYSTORE_PATH') ?: 'qris-sender.keystore')
+                      storePassword 'qrissender2024'
+                      keyAlias 'qris-sender'
+                      keyPassword 'qrissender2024'
                   }
               }
+
               buildTypes {
                   release {
+                      minifyEnabled false
                       signingConfig signingConfigs.release
                   }
               }
+
+              compileOptions {
+                  sourceCompatibility JavaVersion.VERSION_17
+                  targetCompatibility JavaVersion.VERSION_17
+              }
+
+              kotlinOptions {
+                  jvmTarget = '17'
+              }
+          }
+
+          dependencies {
+              implementation 'androidx.core:core-ktx:1.12.0'
+              implementation 'androidx.appcompat:appcompat:1.6.1'
+              implementation 'com.google.android.material:material:1.11.0'
+              implementation 'com.squareup.okhttp3:okhttp:4.12.0'
           }
           SIGNING
-
-      - name: Build Release APK
-        run: ./gradlew assembleRelease
+          ./gradlew assembleRelease
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
