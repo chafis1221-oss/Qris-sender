@@ -73,16 +73,17 @@ class DevModeActivity : AppCompatActivity() {
 
         CoroutineScope(Dispatchers.Main).launch {
             val prefs = getSharedPreferences("qris_sender_settings", Context.MODE_PRIVATE)
-            val isDomain = prefs.getBoolean(SettingsActivity.PREF_MODE, false)
-            val url = if (isDomain) {
-                prefs.getString(SettingsActivity.PREF_DOMAIN_URL, SettingsActivity.DEFAULT_DOMAIN_URL) ?: SettingsActivity.DEFAULT_DOMAIN_URL
-            } else {
-                prefs.getString(SettingsActivity.PREF_LOCAL_URL, SettingsActivity.DEFAULT_LOCAL_URL) ?: SettingsActivity.DEFAULT_LOCAL_URL
-            }
+            val domainUrl = prefs.getString(SettingsActivity.PREF_DOMAIN_URL, SettingsActivity.DEFAULT_DOMAIN_URL) ?: SettingsActivity.DEFAULT_DOMAIN_URL
             val apiKey = prefs.getString(SettingsActivity.PREF_API_KEY, SettingsActivity.DEFAULT_API_KEY) ?: SettingsActivity.DEFAULT_API_KEY
 
-            logText.text = "Mengirim ke $url..."
-            val success = ApiService.sendNotification(url, apiKey, text)
+            logText.text = "Mencoba LOCAL..."
+            val success = ApiService.sendWithFallback(
+                localUrl = SettingsActivity.LOCAL_URL,
+                domainUrl = domainUrl,
+                apiKey = apiKey,
+                text = text
+            )
+
             HistoryManager.addItem(this@DevModeActivity, text, success)
             logText.text = if (success) "✅ Berhasil terkirim" else "❌ Gagal mengirim"
         }
