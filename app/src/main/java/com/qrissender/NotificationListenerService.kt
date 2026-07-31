@@ -2,7 +2,6 @@ package com.qrissender
 
 import android.app.Notification
 import android.content.Context
-import android.content.SharedPreferences
 import android.service.notification.NotificationListenerService
 import android.service.notification.StatusBarNotification
 import kotlinx.coroutines.*
@@ -22,19 +21,22 @@ class NotificationListenerService : NotificationListenerService() {
 
         scope.launch {
             val prefs = getSharedPreferences("qris_sender_settings", Context.MODE_PRIVATE)
-            val serverUrl = prefs.getString("server_url", "") ?: ""
-            val apiKey = prefs.getString("api_key", "") ?: ""
+            val isDomain = prefs.getBoolean(SettingsActivity.PREF_MODE, false)
+            val url = if (isDomain) {
+                prefs.getString(SettingsActivity.PREF_DOMAIN_URL, SettingsActivity.DEFAULT_DOMAIN_URL) ?: SettingsActivity.DEFAULT_DOMAIN_URL
+            } else {
+                prefs.getString(SettingsActivity.PREF_LOCAL_URL, SettingsActivity.DEFAULT_LOCAL_URL) ?: SettingsActivity.DEFAULT_LOCAL_URL
+            }
+            val apiKey = prefs.getString(SettingsActivity.PREF_API_KEY, SettingsActivity.DEFAULT_API_KEY) ?: SettingsActivity.DEFAULT_API_KEY
 
-            if (serverUrl.isBlank() || apiKey.isBlank()) return@launch
+            if (url.isBlank() || apiKey.isBlank()) return@launch
 
-            val success = ApiService.sendNotification(serverUrl, apiKey, fullText)
+            val success = ApiService.sendNotification(url, apiKey, fullText)
             HistoryManager.addItem(this@NotificationListenerService, fullText, success)
         }
     }
 
-    override fun onNotificationRemoved(sbn: StatusBarNotification) {
-        // Not needed
-    }
+    override fun onNotificationRemoved(sbn: StatusBarNotification) {}
 
     override fun onDestroy() {
         scope.cancel()

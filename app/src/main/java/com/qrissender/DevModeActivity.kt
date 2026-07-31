@@ -1,17 +1,16 @@
 package com.qrissender
 
+import android.content.Context
 import android.os.Bundle
 import android.view.Gravity
 import android.widget.*
 import androidx.appcompat.app.AppCompatActivity
-import androidx.cardview.widget.CardView
 import android.graphics.Color
 import kotlinx.coroutines.*
 
 class DevModeActivity : AppCompatActivity() {
 
     private lateinit var inputText: EditText
-    private lateinit var sendButton: Button
     private lateinit var logText: TextView
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -26,7 +25,6 @@ class DevModeActivity : AppCompatActivity() {
             setBackgroundColor(Color.parseColor("#F8F9FA"))
         }
 
-        // Title
         val title = TextView(this).apply {
             text = "Dev Mode"
             textSize = 20f
@@ -35,7 +33,6 @@ class DevModeActivity : AppCompatActivity() {
         }
         root.addView(title)
 
-        // Input
         inputText = EditText(this).apply {
             hint = "Isi teks notifikasi palsu"
             setTextColor(Color.parseColor("#1A1A2E"))
@@ -45,8 +42,7 @@ class DevModeActivity : AppCompatActivity() {
             setMargins(0, 32, 0, 0)
         })
 
-        // Send Button
-        sendButton = Button(this).apply {
+        val sendButton = Button(this).apply {
             text = "Kirim Notifikasi Palsu"
             setTextColor(Color.WHITE)
             setBackgroundColor(Color.parseColor("#1A1A2E"))
@@ -56,7 +52,6 @@ class DevModeActivity : AppCompatActivity() {
             setMargins(0, 16, 0, 0)
         })
 
-        // Log
         logText = TextView(this).apply {
             text = ""
             textSize = 13f
@@ -77,17 +72,17 @@ class DevModeActivity : AppCompatActivity() {
         }
 
         CoroutineScope(Dispatchers.Main).launch {
-            val prefs = getSharedPreferences("qris_sender_settings", MODE_PRIVATE)
-            val serverUrl = prefs.getString("server_url", "") ?: ""
-            val apiKey = prefs.getString("api_key", "") ?: ""
-
-            if (serverUrl.isBlank() || apiKey.isBlank()) {
-                logText.text = "Error: URL server atau API key belum diatur"
-                return@launch
+            val prefs = getSharedPreferences("qris_sender_settings", Context.MODE_PRIVATE)
+            val isDomain = prefs.getBoolean(SettingsActivity.PREF_MODE, false)
+            val url = if (isDomain) {
+                prefs.getString(SettingsActivity.PREF_DOMAIN_URL, SettingsActivity.DEFAULT_DOMAIN_URL) ?: SettingsActivity.DEFAULT_DOMAIN_URL
+            } else {
+                prefs.getString(SettingsActivity.PREF_LOCAL_URL, SettingsActivity.DEFAULT_LOCAL_URL) ?: SettingsActivity.DEFAULT_LOCAL_URL
             }
+            val apiKey = prefs.getString(SettingsActivity.PREF_API_KEY, SettingsActivity.DEFAULT_API_KEY) ?: SettingsActivity.DEFAULT_API_KEY
 
-            logText.text = "Mengirim..."
-            val success = ApiService.sendNotification(serverUrl, apiKey, text)
+            logText.text = "Mengirim ke $url..."
+            val success = ApiService.sendNotification(url, apiKey, text)
             HistoryManager.addItem(this@DevModeActivity, text, success)
             logText.text = if (success) "✅ Berhasil terkirim" else "❌ Gagal mengirim"
         }
